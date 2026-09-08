@@ -1,3 +1,4 @@
+import { createMining } from './mining/rig';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createCreature, TRAVEL_SPEED } from './creature';
@@ -174,6 +175,7 @@ function boot() {
     let lastFootX = creature.legs[0].foot.x, motionFrames = 0, changedPoses = 0;
     const systemReduced = matchMedia('(prefers-reduced-motion: reduce)');
     let ui: ReturnType<typeof createGameUI>;
+    const mining = createMining(creature.body, scene, id => settlement.outcrop(id), () => [...state.outcrops].sort((a,b) => Math.abs(state.distance-a.born-9)-Math.abs(state.distance-b.born-9)).map(o => o.id), (id, precise) => ui.completeGather(id, precise));
     function save() { try {
         localStorage.setItem(saveKey, serialize(state));
         storageOK = true;
@@ -196,13 +198,13 @@ function boot() {
         previousKeepLevel = state.keepLevel;
         save();
     }
-    ui = createGameUI(() => state, { audio: sound, pace: () => pace, paused: () => paused, lighting: () => lightMode, view: action => {
+    ui = createGameUI(() => state, { requestGather: id => mining.quickStrike(id), audio: sound, pace: () => pace, paused: () => paused, lighting: () => lightMode, view: action => {
         if (action === 'pace') pace = pace === 1 ? 1.5 : pace === 1.5 ? .5 : 1;
         else if (action === 'light') lightMode = LIGHT_MODES[(LIGHT_MODES.indexOf(lightMode)+1)%LIGHT_MODES.length];
         else if (action === 'reset') resetCamera();
         else if (action === 'hide') toggleUI();
         else toggleView(action);
-    }, changed, selected: id => settlement.setSelected(id), celebrate: () => { celebration = 8; creature.react(1); }, reset: () => { settlement.clear(); state = freshState(); accumulator = 0; lastRegion = 0; lightMode = 'Journey'; celebration = 0; changed(); resetCamera(); } }, saveKey + '-welcome-v1');
+    }, changed, selected: id => settlement.setSelected(id), celebrate: () => { celebration = 8; creature.react(1); }, reset: () => { mining.cancel(); settlement.clear(); state = freshState(); accumulator = 0; lastRegion = 0; lightMode = 'Journey'; celebration = 0; changed(); resetCamera(); } }, saveKey + '-welcome-v1');
     settlement.sync(state, null);
     ui.setSaving(storageOK);
     function togglePause() { paused = !paused; $('pause-label').textContent = paused ? 'Resume' : 'Pause'; $('pause-icon').textContent = paused ? '▷' : 'Ⅱ'; $('pause').setAttribute('aria-label', paused ? 'Resume journey' : 'Pause journey'); $('pause').title = `${paused ? 'Resume' : 'Pause'} journey (Space)`; }
@@ -246,16 +248,18 @@ function boot() {
         ui.gather(); });
     controls.addEventListener('start', () => cameraTween = null);
     const picker=createPicker();
+    let hoveredOutcrop=false;
     let down:{x:number;y:number}|null=null, hoverPoint:{x:number;y:number}|null=null, hoverClock=0;
     function pickAt(x:number,y:number,touch=false){
         const rect=renderer.domElement.getBoundingClientRect();
         scene.updateMatrixWorld(true);
         return picker.pick(settlement.pickTargets,camera,(x-rect.left)/rect.width*2-1,-(y-rect.top)/rect.height*2+1,rect.width,rect.height,touch);
     }
-    function clearHover(){hoverPoint=null;settlement.setHovered(null);renderer.domElement.style.cursor='';settlement.hidePreview();}
+    function clearHover(){hoveredOutcrop=false;hoverPoint=null;settlement.setHovered(null);renderer.domElement.style.cursor='';settlement.hidePreview();}
     function updateHover(){
         if(!hoverPoint || down || viewMode || $<HTMLDialogElement>('modal').open)return;
         const p=pickAt(hoverPoint.x,hoverPoint.y);
+        hoveredOutcrop=p?.type==='outcrop';
         renderer.domElement.style.cursor=p?'pointer':'';
         settlement.setHovered(ui.placing?null:p?.type==='building'?p.id:p?.type==='keep'||p?.type==='beacon'?p.type:null);
         if(ui.placing){
@@ -263,6 +267,16 @@ function boot() {
             if(pad!==undefined)settlement.preview(pad,p?.type==='pad');else settlement.hidePreview();
         }
     }
+    const miningHint=document.createElement('div');miningHint.className='mining-hint';miningHint.hidden=true;$('overlay').append(miningHint);
+    const miningRay = new THREE.Raycaster();
+    function aimRay(e:PointerEvent){const r=renderer.domElement.getBoundingClientRect();miningRay.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1),camera);return miningRay;}
+    function cancelMining(){mining.cancel();controls.enabled=true;down=null;}
+    renderer.domElement.addEventListener('pointerdown',e=>{if(e.button!==0||ui.placing||viewMode)return;const p=pickAt(e.clientX,e.clientY,e.pointerType==='touch');if(p?.type==='outcrop'&&mining.begin(p.id,aimRay(e))){e.stopImmediatePropagation();controls.enabled=false;renderer.domElement.setPointerCapture(e.pointerId);down=null;}},true);
+    renderer.domElement.addEventListener('pointermove',e=>{if(mining.aiming)mining.aim(aimRay(e));},true);
+    renderer.domElement.addEventListener('pointerup',e=>{if(mining.aiming){mining.aim(aimRay(e));mining.release();controls.enabled=true;if(renderer.domElement.hasPointerCapture(e.pointerId))renderer.domElement.releasePointerCapture(e.pointerId);e.stopImmediatePropagation();}},true);
+    renderer.domElement.addEventListener('pointercancel',cancelMining);
+    renderer.domElement.addEventListener('lostpointercapture',()=>{if(mining.aiming)cancelMining();});
+    addEventListener('blur',cancelMining);addEventListener('keydown',e=>{if(e.key==='Escape')cancelMining();});
     renderer.domElement.addEventListener('pointerdown',e=>{if(e.button===0){down={x:e.clientX,y:e.clientY};settlement.setHovered(null);}});
     renderer.domElement.addEventListener('pointerup',e=>{
         const clicked=down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<=6;down=null;
@@ -310,11 +324,20 @@ function boot() {
         }
         lastFootX = creature.legs[0].foot.x;
         settlement.update(state, visualTime, visualDistance);
+        if ($<HTMLDialogElement>('modal').open && mining.aiming) cancelMining();
+        mining.update(document.hidden || $<HTMLDialogElement>('modal').open ? 0 : dt, reduced);
+        const hint=mining.hint || (hoveredOutcrop && !down && !ui.placing && !viewMode ? 'Hold to aim · release to break stone' : '');
+        miningHint.hidden=!hint;miningHint.textContent=hint;
         const environment = sampleEnvironment((visualTime+environmentOffset)*environmentSpeed,lightMode);
         lightMix=environment.night;
         world.setEnvironment(environment);
         world.update(visualDistance, visualTime, reduced, state.beacon);
         world.reactToFeet(creature.legs,visualDistance,visualTime,reduced);
+        if(import.meta.env.DEV && sandbox && params.get('deerCamera')==='1'){
+            controls.minDistance=3;
+            controls.target.copy(world.encounters.deer.root.position).add(new THREE.Vector3(0,1.3,0));
+            camera.position.copy(controls.target).add(new THREE.Vector3(-4,1.5,5).applyAxisAngle(new THREE.Vector3(0,1,0),world.encounters.deer.root.rotation.y));
+        }
         regionBlend = THREE.MathUtils.damp(regionBlend, regionAt(-visualDistance), 1, dt);
 
         uiClock += dt;

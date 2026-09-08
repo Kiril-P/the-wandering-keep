@@ -34,3 +34,15 @@ w.update(40,[],false,0,100);assert.ok(Array.from(fire.array).some(v=>Math.abs(v)
 const perches=[{x:-30,y:6,z:-10}];w.update(0,perches);const perched=w.liftBirds[0].body.position.y;
 for(let d=1;d<=24;d++)w.update(d,perches);assert.ok(w.liftBirds[0].body.position.y>perched+4,'Swallows lift from an actual grove perch as Morrow approaches');
 console.log('PASS Watch/retreat deer, grounded hooves, sparse flower/firefly encounters and reactive perched birds');
+// Dense trunks include the original spawn and both sides of the wandering patch.
+const trunks=[{x:-55,z:-9,radius:.7},{x:-52,z:-11,radius:.65},{x:-58,z:-12,radius:.8}];
+const walker=createEncounters(new THREE.Group(),night);walker.update(35,0,false,trunks);
+const origin=walker.deer.root.position.clone();let movement=0,last=origin.clone();
+for(let frame=1;frame<=3600;frame++){
+  walker.update(35,frame/60,false,trunks);const p=walker.deer.root.position;
+  for(const trunk of trunks)assert.ok(Math.hypot(p.x-35-trunk.x,p.z-trunk.z)>trunk.radius+1.149,'Full body clears trunks while wandering');
+  movement+=p.distanceTo(last);last.copy(p);
+}
+assert.ok(movement>4,'Idle encounters include actual walking, not just head motion');
+const still=walker.deer.root.position.clone();walker.update(35,60,true,trunks);assert.deepEqual(walker.deer.root.position,still,'Reduced motion keeps decorative wandering still');
+console.log('PASS Clear deer spawns, sixty seconds of obstacle-aware wandering, and reduced-motion stability');

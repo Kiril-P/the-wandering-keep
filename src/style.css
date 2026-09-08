@@ -18,3 +18,5 @@ dialog:has(.dialog-close){padding-top:44px}.dialog-close{position:absolute;right
 .production-detail .supply-help{color:#886037;line-height:1.6;margin-top:10px}
 .environment-note{font-size:11px;line-height:1.6}
 @media(max-width:600px){.supply-hint{max-width:none;font-size:8px}}
+
+.mining-hint { position:absolute; bottom:92px; left:50%; transform:translateX(-50%); padding:9px 16px; border-radius:20px; background:#f7f3e7ed; color:#425440; font-size:12px; white-space:nowrap; pointer-events:none; box-shadow:0 3px 18px #21302320; }

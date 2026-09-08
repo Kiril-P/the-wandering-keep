@@ -1,3 +1,5 @@
+import { createOutcrop, type OutcropArt } from './mining/outcrop';
+import { renderedHeight } from './world/terrain';
 import { selectionVolume } from './selection';
 import * as THREE from 'three';
 import { M, box, cyl, rock, sphere, mesh, beam, tube, consolidate, lantern, rand, sharedGeometries } from './art';
@@ -288,8 +290,7 @@ export function createSettlement(body: THREE.Group, scene: THREE.Scene, keep: TH
     const selection = mesh(root, new THREE.RingGeometry(.53, .57, 40), chooseMat);
     selection.rotation.x = -Math.PI / 2;
     selection.visible = false;
-    const outcropModels = new Map<number, THREE.Group>();
-    const rng = rand(338);
+    const outcropModels = new Map<number, OutcropArt>();
     let selected: number | 'keep' | 'beacon' | null = null;
     let hovered: number | 'keep' | 'beacon' | null = null;
     const hoverOriginals = new Map<THREE.Mesh, THREE.Material>();
@@ -386,43 +387,27 @@ export function createSettlement(body: THREE.Group, scene: THREE.Scene, keep: TH
         wings.forEach((w, i) => w.visible = s.expansions > i);
         keepUpgrades.forEach((g, i) => g.visible = s.keepLevel > i + 1);
         beaconTop.visible = s.beacon;
-        for (const [id, g] of outcropModels)
-            if (!s.outcrops.some(o => o.id === id)) {
-                dispose(g);
-                outcropModels.delete(id);
-            }
-        for (const o of s.outcrops)
-            if (!outcropModels.has(o.id)) {
-                const g = new THREE.Group();
-                scene.add(g);
-                g.userData.pick = { type: 'outcrop', id: o.id } satisfies Pick;
-                for (let i = 0; i < 5; i++) {
-                    const r = .24 + rng() * .23;
-                    rock(g, i % 2 ? M.stoneLight : M.stone, (rng() - .5) * .75, r * .65, (rng() - .5) * .6, r, r * .8, r);
-                }
-                const halo = mesh(g, new THREE.RingGeometry(.57, .61, 32), chooseMat, 0, .025, 0);
-                halo.rotation.x = -Math.PI / 2;
-                const shard = mesh(g, new THREE.OctahedronGeometry(.14), M.brass, 0, .79, 0, .7, 1, .7);
-                shard.userData.marker = true;
-                consolidate(g);
-                selectionVolume(g, {type:'outcrop',id:o.id}, v(1.2,.85,1.1), v(0,.42,0));
-                outcropModels.set(o.id, g);
-            }
+        for (const [id, art] of outcropModels) if (!s.outcrops.some(o=>o.id===id)){art.dispose();outcropModels.delete(id);}
+        for(const o of s.outcrops){
+            let art=outcropModels.get(o.id);
+            if(!art){art=createOutcrop(o);scene.add(art.root);outcropModels.set(o.id,art);}
+            art.damage(o.hits);
+        }
         const b = s.buildings.find(b => b.id === selected);
         selection.visible = !!b;
         if (b)
             selection.position.set(PADS[b.pad][0], PADS[b.pad][1] + .025, PADS[b.pad][2]);
     }
-    return { root, sync, preview, setHovered,
+    return { root, sync, preview, setHovered, outcrop(id:number){return outcropModels.get(id);},
         hidePreview() { if (ghost) ghost.root.visible = false; },
-        get pickTargets() { return [keep, beaconProxy, ...pads.filter(p => p.visible), ...[...models.values()].map(m => m.proxy), ...[...outcropModels.values()].flatMap(g => g.children.filter(c => c.userData.selectionOnly))]; },
-        setSelected(id: typeof selected) { selected = id; }, get targets() { return [keep, beacon, ...pads, ...[...models.values()].map(m => m.visual.root), ...[...outcropModels.values()]]; }, update(s: GameState, t: number, distance = s.distance) { const flow = production(s); for (const b of s.buildings)
+        get pickTargets() { return [keep, beaconProxy, ...pads.filter(p => p.visible), ...[...models.values()].map(m => m.proxy), ...[...outcropModels.values()].map(a=>a.proxy)]; },
+        setSelected(id: typeof selected) { selected = id; }, get targets() { return [keep, beacon, ...pads, ...[...models.values()].map(m => m.visual.root), ...[...outcropModels.values()].map(a=>a.root)]; }, update(s: GameState, t: number, distance = s.distance) { const flow = production(s); for (const b of s.buildings)
             models.get(b.id)?.visual.update(t, (flow.buildings.get(b.id)?.rate ?? 0) > 1e-7); for (const o of s.outcrops) {
-            const g = outcropModels.get(o.id);
+            const g = outcropModels.get(o.id)?.root;
             if (g) {
-                g.position.set(-6 + distance - o.born, .025, o.side * 3.95);
-                g.scale.setScalar(.77 + o.hits * .038);
+                const x=-9+distance-o.born,z=o.side*5.65;
+                g.position.set(x,renderedHeight(x-distance,z)-.07,z);
             }
         } crystal.rotation.y = t * .7; rings.forEach((r, i) => { r.rotation.set(Math.PI / 2 + Math.sin(t * .5 + i) * .4, t * .3 * (i ? 1 : -1), i * .8); }); crown.rotation.y = t * .3; }, clear() { setHovered(null); if (ghost)
-            dispose(ghost.root); ghost = null; ghostKind = null; slotHighlights.forEach(h => h.visible = false); pads.forEach(p => p.material = padMat); models.forEach(m => dispose(m.visual.root)); models.clear(); outcropModels.forEach(dispose); outcropModels.clear(); } };
+            dispose(ghost.root); ghost = null; ghostKind = null; slotHighlights.forEach(h => h.visible = false); pads.forEach(p => p.material = padMat); models.forEach(m => dispose(m.visual.root)); models.clear(); outcropModels.forEach(a=>a.dispose()); outcropModels.clear(); } };
 }

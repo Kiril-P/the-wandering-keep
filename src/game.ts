@@ -86,15 +86,15 @@ export function tick(s: GameState, dt: number) {
         s.resources.runes += output;
     }
     s.spawnClock += dt;
-    s.outcrops = s.outcrops.filter(o => o.hits > 0 && s.distance - o.born < 14);
+    s.outcrops = s.outcrops.filter(o => o.hits > 0 && s.distance - o.born < 28);
     if (s.spawnClock >= 7) {
         s.spawnClock %= 7;
         if (s.outcrops.length < 3)
             s.outcrops.push({ id: s.nextId++, born: s.distance, hits: 6, side: s.nextId % 2 ? 1 : -1 });
     }
 }
-export function gather(s: GameState, id?: number) { const o = s.outcrops.find(o => id === undefined || o.id === id); if (!o || o.hits <= 0)
-    return false; o.hits--; s.resources.stone += 2; s.totalGathered += 2; if (!o.hits)
+export function gather(s: GameState, id?: number, seamHit = false) { const o = s.outcrops.find(o => id === undefined || o.id === id); if (!o || o.hits <= 0)
+    return false; o.hits--; const amount = seamHit ? 3 : 2; s.resources.stone += amount; s.totalGathered += amount; if (!o.hits)
     s.outcrops = s.outcrops.filter(p => p.id !== o.id); return true; }
 export function buildReason(s: GameState, kind: BuildingKind) { if (s.keepLevel < BUILDINGS[kind].keep)
     return `Requires Keep level ${BUILDINGS[kind].keep}`; if (s.buildings.length >= capacity(s))

@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node scripts/test-game.mjs && node scripts/test-motion.mjs && node scripts/test-settlement.mjs && node scripts/test-world.mjs && node scripts/test-audio.mjs && node scripts/test-interaction-environment.mjs && node scripts/test-living-landscape.mjs"
+    "test": "node scripts/test-game.mjs && node scripts/test-motion.mjs && node scripts/test-settlement.mjs && node scripts/test-world.mjs && node scripts/test-audio.mjs && node scripts/test-interaction-environment.mjs && node scripts/test-living-landscape.mjs && node scripts/test-mining.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"

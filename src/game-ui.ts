@@ -12,6 +12,7 @@ const setHTML = (el: HTMLElement, text: string) => { if (rendered.get(el) !== te
 } };
 export type ViewAction = 'pace' | 'light' | 'reset' | 'scenic' | 'creature' | 'hide';
 export function createGameUI(get: () => GameState, callbacks: {
+    requestGather: (id?: number) => void;
     changed: () => void;
     selected: (id: number | 'keep' | 'beacon' | null) => void;
     reset: () => void;
@@ -31,7 +32,8 @@ export function createGameUI(get: () => GameState, callbacks: {
         return false;
     } callbacks.changed(); render(); toast(message); return true; }
     function choose(id: typeof selected) { if (id !== null) callbacks.audio.cue('select'); selected = id; placing = null; buildOpen = false; callbacks.selected(id); callbacks.changed(); render(); if (id !== null) $('inspector').querySelector<HTMLButtonElement>('.close-inspector')?.focus(); }
-    function doGather(id?: number) { if (gather(get(), id)) {
+    function doGather(id?: number) { callbacks.requestGather(id); }
+    function completeGather(id: number, precise = false) { if (gather(get(), id, precise)) {
         callbacks.changed();
         render();
         $('gather').classList.remove('gathered');
@@ -39,9 +41,8 @@ export function createGameUI(get: () => GameState, callbacks: {
         const stone = $('resources').querySelector<HTMLElement>('.stone')!;
         stone.getAnimations().forEach(a => a.cancel());
         stone.animate([{ backgroundColor: '#f3d18a', color: '#354732' }, { backgroundColor: 'transparent' }], { duration: 550 });
-    }
-    else
-        toast('More outcrops are coming along the road.'); }
+        return true;
+    } return false; }
     function showDialog(content: string) {
         const alreadyOpen = modal.open;
         modal.innerHTML = `<button class="dialog-close" data-dismiss="true" aria-label="Close menu">×</button>${content}`;
@@ -50,7 +51,7 @@ export function createGameUI(get: () => GameState, callbacks: {
     }
     function welcome() {
         welcomeOpen = true;
-        showDialog(`<span class="eyebrow">THE WANDERING KEEP</span><div class="welcome-symbol" aria-hidden="true">✧</div><h2 id="dialog-title">A little keep.<br/><em>A long journey.</em></h2><p class="welcome-intro">Meet Morrow. An ancient creature carrying your home through a world worth slowing down for.</p><ol class="welcome-steps"><li><b>Gather a little stone</b><span>Use Gather or click a gold-marked outcrop. Your first quarry costs 20 stone.</span></li><li><b>Build a living settlement</b><span>Open Build, choose a building, then a glowing pad. Buildings produce resources as you wander.</span></li><li><b>Grow toward the beacon</b><span>Gardens make essence. Forges turn stone and essence into runestones. Upgrade your Keep to make room.</span></li></ol><p class="welcome-note">Drag to look around · Scroll or pinch to zoom<br/>The guide is always in Menu.</p><button id="begin-journey" class="primary wide" autofocus>${get().elapsed > 5 ? 'Continue journey' : 'Begin journey'} <span>→</span></button>`);
+        showDialog(`<span class="eyebrow">THE WANDERING KEEP</span><div class="welcome-symbol" aria-hidden="true">✧</div><h2 id="dialog-title">A little keep.<br/><em>A long journey.</em></h2><p class="welcome-intro">Meet Morrow. An ancient creature carrying your home through a world worth slowing down for.</p><ol class="welcome-steps"><li><b>Gather a little stone</b><span>Hold a gold-marked rock to aim, then release to break off stone. Bright seams give +3; other hits give +2. Gather or E launches a quick strike. Your first quarry costs 20 stone.</span></li><li><b>Build a living settlement</b><span>Open Build, choose a building, then a glowing pad. Buildings produce resources as you wander.</span></li><li><b>Grow toward the beacon</b><span>Gardens make essence. Forges turn stone and essence into runestones. Upgrade your Keep to make room.</span></li></ol><p class="welcome-note">Drag to look around · Scroll or pinch to zoom<br/>The guide is always in Menu.</p><button id="begin-journey" class="primary wide" autofocus>${get().elapsed > 5 ? 'Continue journey' : 'Begin journey'} <span>→</span></button>`);
     }
     function finishWelcome() {
         if (!welcomeOpen) return;
@@ -65,7 +66,7 @@ export function createGameUI(get: () => GameState, callbacks: {
     function openHelp(page: 'guide' | 'settings' | 'journey' = 'settings') {
         confirmReset = false;
         const s = get(), region = regionIndex(s), next = REGIONS[region + 1], q = objective(s);
-        const content = page === 'guide' ? `<h2 id="dialog-title">Make yourself at home.</h2><details open><summary>Gather, build, grow</summary><p>Gather 20 stone for a Quarry Tower, then open Build and choose an empty pad. Quarries produce stone; Moss Gardens produce essence. Click a building to upgrade it. Open Keep to expand your platform and awaken Morrow.</p></details><details><summary>How production works</summary><p>Buildings share one inventory. Each runestone uses 4 stone + 3 essence. A forge waits when either runs out. Watchtowers add up to 30% production. Removing a building refunds 60% of construction and upgrade costs.</p></details><details><summary>Camera and shortcuts</summary><p>Drag to orbit; scroll or pinch to zoom. E gathers stone. Space pauses. Escape closes a panel or cancels placement. R resets the camera. V opens the scenic view, C brings you closer to Morrow, and H hides the interface.</p></details><button data-page="welcome" class="text-button">Replay the introduction →</button>`
+        const content = page === 'guide' ? `<h2 id="dialog-title">Make yourself at home.</h2><details open><summary>Gather, build, grow</summary><p>Hold an outcrop to aim your tethered pick and release to strike. Aim at a golden seam for 3 stone instead of 2. Each hit breaks off a chunk; six strikes clear an outcrop. Gather or E launches a quick strike. Gather 20 stone for a Quarry Tower, then open Build and choose an empty pad. Quarries produce stone; Moss Gardens produce essence. Click a building to upgrade it. Open Keep to expand your platform and awaken Morrow.</p></details><details><summary>How production works</summary><p>Buildings share one inventory. Each runestone uses 4 stone + 3 essence. A forge waits when either runs out. Watchtowers add up to 30% production. Removing a building refunds 60% of construction and upgrade costs.</p></details><details><summary>Camera and shortcuts</summary><p>Drag to orbit; scroll or pinch to zoom. E gathers stone. Space pauses. Escape closes a panel or cancels placement. R resets the camera. V opens the scenic view, C brings you closer to Morrow, and H hides the interface.</p></details><button data-page="welcome" class="text-button">Replay the introduction →</button>`
             : page === 'journey' ? `<span class="eyebrow">${s.beacon ? 'CHAPTER COMPLETE' : 'YOUR NEXT STEP'}</span><h2 id="dialog-title">${q.title}</h2><p>${q.detail}</p><div class="journey-detail"><b>${REGIONS[region].name}</b><span>${Math.floor(s.distance)} m wandered</span><div class="journey-track">${REGIONS.map((r, i) => `<span class="${region >= i ? 'reached' : ''}" title="${r.name}"></span>`).join('')}</div><p>${next ? `${Math.max(0, Math.ceil(next.distance - s.distance))} m to ${next.name}` : 'The highlands stretch into the distance.'}</p><small>Production bonus +${Math.round((bonus(s) - 1) * 100)}%</small></div>`
             : `<h2 id="dialog-title">Settle into the journey.</h2>${audioControls()}<div class="setting-row"><span>Travel pace</span><button data-view="pace">${callbacks.pace()}×</button></div><label class="setting-row"><span>Reduce decorative motion</span><input id="reduce-motion" type="checkbox" ${s.settings.reducedMotion ? 'checked' : ''}></label><div class="view-actions"><button data-view="scenic">Scenic view <kbd>V</kbd></button><button data-view="creature">Meet Morrow <kbd>C</kbd></button><button data-view="light">Light: ${callbacks.lighting()}</button><button data-view="reset">Reset camera <kbd>R</kbd></button><button data-view="hide">Hide interface <kbd>H</kbd></button></div><p class="environment-note">A day lasts about 24 minutes at normal pace. Mist and showers pass through; wet stone dries as the sky clears. Light can follow the journey or stay at your favourite hour.</p><p id="save-status">${storageOK ? 'Saved on this device.' : 'Saving unavailable — keep this tab open.'} The journey rests while closed or hidden. No offline earnings.</p><button id="reset-save" class="danger text-button">Start a new journey</button>`;
         showDialog(`<div class="menu-tabs" aria-label="Menu sections">${(['settings', 'guide', 'journey'] as const).map(p => `<button data-page="${p}" aria-pressed="${p === page}">${p === 'guide' ? 'How to play' : p === 'journey' ? 'Journey' : 'Settings'}</button>`).join('')}</div>${content}<div class="dialog-actions"><button id="close-dialog" class="primary">Back to Morrow</button></div>`);
@@ -183,7 +184,7 @@ export function createGameUI(get: () => GameState, callbacks: {
         setHTML($('resources'), RESOURCES.map(r => `<div class="resource ${r}" title="${r === 'runes' && supply ? supply : LABELS[r]}"><span class="resource-icon">${r === 'stone' ? '⬡' : r === 'essence' ? '❧' : '◇'}</span><div><span>${LABELS[r]}</span><b>${fmt(s.resources[r])}</b></div><small class="${rates[r] < 0 ? 'negative' : ''}">${r === 'runes' && supply ? `<span class="supply-hint">${rates.runes < 1e-7 ? 'Needs ' : 'Low '}${missing.join(' + ')}</span>` : `${rates[r] >= 0 ? '+' : ''}${rates[r].toFixed(2)}/s`}</small></div>`).join(''));
         setHTML($('objective'), `<span>Next</span> ${q.title} <span aria-hidden="true">↗</span>`);
         $<HTMLButtonElement>('gather').disabled = s.outcrops.length === 0;
-        $('gather').title = s.outcrops.length ? 'Gather 2 stone (E)' : 'More outcrops are coming along the road';
+        $('gather').title = s.outcrops.length ? 'Launch pick for 2 stone (E). Hold a rock and aim at a golden seam for 3.' : 'More outcrops are coming along the road';
         $('build-tray').hidden = !buildOpen;
         $('inspector').hidden = selected === null;
         $('toggle-build').setAttribute('aria-expanded', String(buildOpen));
@@ -205,7 +206,7 @@ export function createGameUI(get: () => GameState, callbacks: {
             $('toast').classList.remove('visible');
     }
     render();
-    return { render, toast, gather: doGather, cancel, get placing() { return placing; }, pick(p: Pick) { if (p.type === 'outcrop')
+    return { render, toast, completeGather, gather: doGather, cancel, get placing() { return placing; }, pick(p: Pick) { if (p.type === 'outcrop')
             doGather(p.id); if (p.type === 'pad') {
             if (placing)
                 place(p.pad);

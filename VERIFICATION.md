@@ -141,3 +141,16 @@ Five reactive swallows use actual grove perch positions and lift as Morrow appro
 The new living-landscape tests cover contact counting, print anchoring, pause, fixed pool sizes over a long run, reduced motion, route continuity, contrasting forest/overlook populations, deer retreat and grounded hooves, sparse firefly windows, and birds leaving perches. The full test suite and production build pass, with the existing bundle-size advisory.
 
 Browser inspection covered the wooded passage, open golden overlook, night flowers/fireflies and deer, and the full nine-building Skycastle in woodland at 1280 × 720 and 390 × 844. The populated desktop sample recorded 8.33 ms average frame interval, 706 draw calls, 938,210 triangles, nine retained sections, and pixel ratio 1.65. These are development-machine observations, not a physical-phone benchmark. Inspected logs contained no shader/runtime warnings or errors. Test fixtures remained separate from the normal save.
+
+### Interactive outcrop mining
+
+- Four seeded outcrop families (granite, sandstone, slate, quartz), approximately 1.8–2.55 units tall, with stable selection proxies and six removable pieces.
+- Hold an outcrop, aim at a golden seam, and release: tethered pick launches, impact exposes fractures and scatters chips, then the winch retrieves stone. Ordinary strikes award 2; seam strikes award 3. Gather/E targets the nearest passing outcrop. No timing penalty.
+- Automated mining checks cover one award per flight, seam bonuses, cancellation, final-piece disposal, partial-damage save restoration, and distinct family bounds. Full test suite and production build pass.
+- In-browser checks: early and upgraded Keep compositions, narrow and desktop layouts, pointer strike, keyboard strike, cable animation and chunk removal. No browser errors/warnings observed. Existing production bundle-size advisory remains.
+
+### Deer refinement
+
+- Reworked proportions, tapered muzzle, alert ears, forked antlers and narrower rump marking; animated head lowering, ear flicks and tail.
+- Quiet encounters alternate slow wandering with grazing. Turns are rate-limited; retreat and wandering use trunk clearance from the actual vegetation placements, including safe spawn selection. Stance hooves retain landscape-space contact points.
+- Full automated suite and production build pass. Added a 60-second dense-trunk wandering regression, plus reduced-motion stability. Browser inspected from close front/side and rear views; no runtime errors observed. `?sandbox=1&scenario=encounters&deerCamera=1` provides a development-only tracking view.

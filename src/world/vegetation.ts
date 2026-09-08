@@ -87,6 +87,7 @@ export function populateVegetation(root: THREE.Group, origin:number, lib:ReturnT
         const side=i%3===0?1:-1,z=side*(side>0?16+rng()*10:7.5+rng()*16);
         trees.push({x,y:renderedHeight(gx,z)-.15,z,s:1.1+rng()*1.6,r:regionAt(gx),angle:rng()*6,kind:i%4===0?2:0});
     }
+    root.userData.obstacles=trees.map(p=>({x:p.x+origin,z:p.z,radius:.3*p.s}));
     root.userData.perches=trees.filter(p=>p.z<0&&Math.abs(p.z)<20&&p.s>1.2).slice(0,4).map(p=>({x:p.x+origin,y:p.y+p.s*3.05,z:p.z}));
     for(let i=0;i<1800*density;i++){
         const x=(rng()-.5)*SECTION_SIZE,gx=x+origin,z=(rng()>.5?1:-1)*(2.95+rng()*14.6),r=regionAt(gx);
