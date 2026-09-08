@@ -2,6 +2,14 @@
 
 A playable 3D incremental game about building a settlement on the back of Morrow, a six-legged stone guardian. This implements the first chapter of the Walking Castle PRD with procedural art and a compact economy.
 
+[Play The Wandering Keep](https://the-wandering-keep.vercel.app) · [Source on GitHub](https://github.com/Kiril-P/the-wandering-keep)
+
+## Hosting
+
+Hosted on Vercel as a static Vite application. `vercel.json` uses `npm ci`, `npm run build`, and the `dist` output directory. No server, database, or application secrets are required. Progress saves in each player's browser; local development and the hosted site have separate storage.
+
+To publish updates from a linked checkout, run `npx vercel deploy --prod`. The initial release uses CLI deployment. Automatic deployment from GitHub pushes requires connecting the repository in Vercel after linking the GitHub login to the Vercel account.
+
 ## Run
 
 ```sh
