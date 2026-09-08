@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="theme-color" content="#e5e4cc"/><title>The Wandering Keep — Walking Castle Incremental</title></head>
+<body><main id="app"><div id="scene" aria-label="Interactive 3D walking castle. Drag to orbit, click highlighted outcrops to gather, or select buildings."></div>
+<div class="ui" id="overlay">
+<header><span class="wordmark">THE WANDERING<br/>KEEP</span><div id="resources" aria-label="Resources"></div><div class="header-actions"><button id="pause" aria-label="Pause journey" title="Pause journey (Space)"><span id="pause-icon">Ⅱ</span><span id="pause-label">Pause</span></button><button id="help" aria-label="Menu and settings">Menu</button></div></header>
+<button id="objective" aria-label="Journey and next step"></button>
+<aside id="inspector" aria-label="Selected building" hidden></aside>
+<section id="build-tray" aria-label="Construction" hidden><div class="panel-heading"><h2>Build on Morrow</h2><button id="close-build" aria-label="Close build menu">×</button></div><nav id="build-menu" aria-label="Build menu"></nav></section>
+<div id="placement" hidden></div><div id="toast" role="status" aria-live="polite"></div>
+<footer><nav class="action-dock" aria-label="Settlement actions"><button id="gather" class="primary" title="Gather stone (E)">Gather <span>+2 stone</span></button><button id="toggle-build" aria-controls="build-tray" aria-expanded="false">Build</button><button id="show-keep" aria-controls="inspector" aria-expanded="false">Keep</button></nav></footer>
+</div><button id="show" hidden>Show interface <kbd>H</kbd></button><div id="loading"><span class="loading-mark">✧</span><p>Waking the hillside…</p></div><div id="error" hidden></div><dialog id="modal" aria-labelledby="dialog-title"></dialog></main><script type="module" src="/src/main.ts"></script></body></html>

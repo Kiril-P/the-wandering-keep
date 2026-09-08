@@ -1,0 +1,49 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Soundscape verification</title><style>body{font:15px system-ui;background:#f5f2e6;color:#304536;max-width:850px;margin:40px auto;padding:20px}button{padding:12px}pre{white-space:pre-wrap}audio{display:block;width:100%;margin:12px 0}</style><h1>Soundscape verification</h1><p>Development-only render checks using the same audio graph as the game. Nothing changes the game save.</p><button id="run">Render and verify</button><pre id="results">Ready</pre><div id="previews"></div><script type="module">
+import { Soundscape } from '../src/audio/soundscape.ts';
+import { DEFAULT_AUDIO } from '../src/audio/score.ts';
+if (!import.meta.env.DEV) throw Error('Development only');
+const results=document.querySelector('#results'), previews=document.querySelector('#previews');
+function stats(buffer, start=0, end=buffer.duration) {
+ let peak=0,energy=0,delta=0,count=0,stereo=0;
+ const a=Math.ceil(start*buffer.sampleRate),b=Math.floor(end*buffer.sampleRate);
+ for(let ch=0;ch<buffer.numberOfChannels;ch++){const p=buffer.getChannelData(ch);for(let i=a;i<b;i++){if(!Number.isFinite(p[i]))throw Error('Non-finite sample');peak=Math.max(peak,Math.abs(p[i]));energy+=p[i]*p[i];if(i>a)delta=Math.max(delta,Math.abs(p[i]-p[i-1]));count++;}}
+ const l=buffer.getChannelData(0),r=buffer.getChannelData(1);for(let i=a;i<b;i++)stereo+=(l[i]-r[i])**2;
+ return {peak:+peak.toFixed(6),rms:+Math.sqrt(energy/count).toFixed(6),maxSampleStep:+delta.toFixed(6),stereoRms:+Math.sqrt(stereo/(b-a)).toFixed(6)};
+}
+function wav(buffer) {const n=buffer.length,bytes=new ArrayBuffer(44+n*4),v=new DataView(bytes);const word=(offset,text)=>[...text].forEach((s,i)=>v.setUint8(offset+i,s.charCodeAt(0)));word(0,'RIFF');v.setUint32(4,36+n*4,true);word(8,'WAVE');word(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,2,true);v.setUint32(24,buffer.sampleRate,true);v.setUint32(28,buffer.sampleRate*4,true);v.setUint16(32,4,true);v.setUint16(34,16,true);word(36,'data');v.setUint32(40,n*4,true);for(let i=0;i<n;i++)for(let ch=0;ch<2;ch++)v.setInt16(44+i*4+ch*2,Math.max(-1,Math.min(1,buffer.getChannelData(ch)[i]))*32767,true);return new Blob([bytes],{type:'audio/wav'});}
+async function render(name,preferences,seconds=24,scenario='normal'){
+ const ctx=new OfflineAudioContext(2,44100*seconds,44100),sound=new Soundscape(ctx);sound.setPreferences(preferences,0);let maxSources=0;
+ const env=t=>({region:t<10?0:t<18?1:2,night:t<18?0:1,paused:scenario==='paused',menu:false,distance:24,cycle:t/3.2,forge:scenario==='normal',rain:scenario==='rain'?1:0});
+ const step=t=>{sound.update(env(t),t);if(scenario==='normal'){if(t===2)sound.cue('gather',t);if(t===6)sound.cue('build',t);if(t===12)sound.cue('upgrade',t);if(t===20)sound.cue('beacon',t);}if(scenario==='fade'&&t===16)sound.setPreferences({...preferences,muted:true},t);if(scenario==='wake'&&t===8)sound.setPreferences({...preferences,muted:true},t);if(scenario==='wake'&&t===16)sound.setPreferences(preferences,t);maxSources=Math.max(maxSources,sound.activeSources);};
+ step(0);
+ for(let t=.5;t<seconds;t+=.5)ctx.suspend(t).then(()=>{step(t);return ctx.resume();});
+ const buffer=await ctx.startRendering();const report=stats(buffer);sound.dispose();
+ if(sound.activeSources!==0)throw Error('Sources survive disposal');
+ const title=document.createElement('h2');title.textContent=name;const player=document.createElement('audio');player.controls=true;player.src=URL.createObjectURL(wav(buffer));previews.append(title,player);
+ return {name,...report,maxSources,tail:stats(buffer,seconds-3),buffer};
+}
+document.querySelector('#run').onclick=async()=>{document.querySelector('#run').disabled=true;results.textContent='Rendering…';try{
+ const reports=[];
+ for(const [name,prefs,seconds,scenario] of [
+ ['Journey mix',DEFAULT_AUDIO,32,'normal'],
+ ['Music at maximum',{...DEFAULT_AUDIO,music:1,ambience:0,effects:0},24,'normal'],
+ ['Nature at maximum',{...DEFAULT_AUDIO,music:0,ambience:1,effects:0},24,'normal'],
+ ['Actions at maximum',{...DEFAULT_AUDIO,music:0,ambience:0,effects:1},24,'normal'],
+ ['All channels at maximum',{muted:false,music:1,ambience:1,effects:1},24,'normal'],
+ ['Rain at maximum',{muted:false,music:1,ambience:1,effects:1},24,'rain'],
+ ['Muted rain',{...DEFAULT_AUDIO,muted:true},8,'rain'],
+ ['Muted',{...DEFAULT_AUDIO,muted:true},8,'normal'],
+ ['Paused footsteps',{...DEFAULT_AUDIO,music:0,ambience:0,effects:1},8,'paused'],
+ ['Fade to mute',DEFAULT_AUDIO,24,'fade'],
+ ['Resume after mute',DEFAULT_AUDIO,24,'wake']]){
+ const r=await render(name,prefs,seconds,scenario);delete r.buffer;reports.push(r);results.textContent=JSON.stringify(reports,null,2);
+ if(r.peak>=.95)throw Error(name+': insufficient clipping headroom');
+ if(['Muted','Muted rain','Paused footsteps'].includes(name)&&r.rms>1e-6)throw Error(name+': expected silence');
+ if(!['Muted','Muted rain','Paused footsteps'].includes(name)&&r.rms<.0001)throw Error(name+': missing audio');
+ if(name==='Fade to mute'&&r.tail.rms>1e-6)throw Error('Mute leaves an audible tail');
+ if(name==='Resume after mute'&&r.tail.rms<.001)throw Error('Music does not return promptly');
+ if(r.maxSources>190)throw Error('Unbounded source population');
+ }
+ results.textContent='PASS — finite stereo output, headroom, independent channels, mute, paused footsteps, fade and disposal.\n'+JSON.stringify(reports,null,2);
+ }catch(e){results.textContent+='\nFAIL '+e;console.error(e)}finally{document.querySelector('#run').disabled=false}};
+</script></html>
