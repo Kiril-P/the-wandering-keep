@@ -323,7 +323,7 @@ function boot() {
             if (Math.abs(creature.legs[0].foot.x - lastFootX) > 1e-8) changedPoses++;
         }
         lastFootX = creature.legs[0].foot.x;
-        settlement.update(state, visualTime, visualDistance);
+        settlement.update(state, visualTime, visualDistance, reduced);
         if ($<HTMLDialogElement>('modal').open && mining.aiming) cancelMining();
         mining.update(document.hidden || $<HTMLDialogElement>('modal').open ? 0 : dt, reduced);
         const hint=mining.hint || (hoveredOutcrop && !down && !ui.placing && !viewMode ? 'Hold to aim · release to break stone' : '');

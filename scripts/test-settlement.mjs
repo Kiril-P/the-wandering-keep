@@ -156,3 +156,17 @@ assert.ok(widths[2] > widths[0] * 3, 'Level 3 upper storeys dramatically overhan
 for (const level of [1, 3, 2, 3, 3]) { state.keepLevel = level; settlement.sync(state, null); }
 assert.equal(creature.castle.root.children.filter(o => o.name.startsWith('Keep tower level')).length, 3, 'Repeated sync/reload transitions reuse stage geometry');
 console.log('PASS Keep stage silhouettes, single active stage, cached transitions, and flag attachment', { heights, widths });
+
+const productionState=freshState();productionState.buildings=[{id:40,kind:'forge',pad:0,level:1},{id:41,kind:'garden',pad:1,level:1},{id:42,kind:'watchtower',pad:2,level:1}];
+const activitySetup=setup(productionState),activity=activitySetup.settlement;
+const effect=id=>activity.targets.find(o=>o.userData.pick?.id===id)?.getObjectByName('Production activity');
+activity.update(productionState,1);
+assert.equal(effect(40).visible,false,'Starved forge has no production effect');
+assert.equal(effect(41).visible,true,'Producing garden shows activity');
+assert.equal(effect(42).visible,false,'Watchtower does not pretend to generate resources');
+productionState.resources.stone=20;productionState.resources.essence=20;activity.update(productionState,2);
+assert.equal(effect(40).visible,true,'Forge effect resumes with available inputs');
+const mote=effect(40).getObjectByName('Resource mote'),before=mote.position.clone();activity.update(productionState,2);assert.deepEqual(mote.position,before,'Paused simulation freezes motes');
+activity.update(productionState,3,0,true);
+assert.equal(mote.visible,false,'Reduced motion disables rising particles');assert.equal(effect(40).visible,true,'Reduced motion retains steady production signal');
+console.log('PASS Production activity tracks supply, distinguishes support buildings, freezes when paused and respects reduced motion');

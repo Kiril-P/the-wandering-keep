@@ -172,7 +172,32 @@ function model(kind: BuildingKind, level: number) {
         moving.push(t => telescope.rotation.y = t * .22);
     }
     consolidate(fixed);
-    return { root, update(t: number, active: boolean) { moving.forEach(f => f(t, active)); } };
+    const output=new THREE.Group();output.name='Production activity';output.userData.productionEffect=true;output.visible=false;root.add(output);
+    const color=kind==='quarry'?0xffd396:kind==='garden'?0xb4f29c:0x98eaff;
+    const light=new THREE.MeshBasicMaterial({color,transparent:true,opacity:.7,depthWrite:false,toneMapped:false});
+    light.userData.preview=true; // This material belongs to this model and is released with it.
+    const ring=mesh(output,new THREE.TorusGeometry(.53,.025,5,36),light,0,.23,0);ring.rotation.x=Math.PI/2;
+    ring.castShadow=ring.receiveShadow=false;
+    const motes=Array.from({length:3},(_,i)=>{
+        const m=light.clone();m.userData.preview=true;
+        const particle=mesh(output,kind==='quarry'?new THREE.IcosahedronGeometry(.115,0):new THREE.OctahedronGeometry(.12,0),m);
+        particle.castShadow=particle.receiveShadow=false;particle.name='Resource mote';return particle;
+    });
+    return { root, update(t: number, active: boolean, rate=0, reduced=false) {
+        moving.forEach(f => f(t, active));
+        output.visible=active&&kind!=='watchtower';
+        if(!output.visible)return;
+        // A continuous activity cue, not a claim that each mote is one resource.
+        const clock=t*(.65+Math.min(rate,2)*.15)+level*.37;
+        light.opacity=reduced?.65:.55+Math.sin(clock*Math.PI*2)*.18;
+        motes.forEach((particle,i)=>{
+            particle.visible=!reduced;
+            const phase=(clock+i/3)%1,angle=i*Math.PI*2/3+phase*.7;
+            particle.position.set(Math.cos(angle)*.4,(kind==='garden'?.6:1.2)+phase*.9,Math.sin(angle)*.4);
+            particle.rotation.set(phase*2,phase*3,0);particle.scale.setScalar(.65+Math.sin(phase*Math.PI)*.6);
+            (particle.material as THREE.MeshBasicMaterial).opacity=Math.sin(phase*Math.PI)*.85;
+        });
+    } };
 }
 function dispose(root: THREE.Object3D) { root.traverse(o => { if (o instanceof THREE.Mesh) {
     if (!o.userData.selectionOnly && !sharedGeometries.has(o.geometry))
@@ -401,8 +426,8 @@ export function createSettlement(body: THREE.Group, scene: THREE.Scene, keep: TH
     return { root, sync, preview, setHovered, outcrop(id:number){return outcropModels.get(id);},
         hidePreview() { if (ghost) ghost.root.visible = false; },
         get pickTargets() { return [keep, beaconProxy, ...pads.filter(p => p.visible), ...[...models.values()].map(m => m.proxy), ...[...outcropModels.values()].map(a=>a.proxy)]; },
-        setSelected(id: typeof selected) { selected = id; }, get targets() { return [keep, beacon, ...pads, ...[...models.values()].map(m => m.visual.root), ...[...outcropModels.values()].map(a=>a.root)]; }, update(s: GameState, t: number, distance = s.distance) { const flow = production(s); for (const b of s.buildings)
-            models.get(b.id)?.visual.update(t, (flow.buildings.get(b.id)?.rate ?? 0) > 1e-7); for (const o of s.outcrops) {
+        setSelected(id: typeof selected) { selected = id; }, get targets() { return [keep, beacon, ...pads, ...[...models.values()].map(m => m.visual.root), ...[...outcropModels.values()].map(a=>a.root)]; }, update(s: GameState, t: number, distance = s.distance, reduced = s.settings.reducedMotion) { const flow = production(s); for (const b of s.buildings)
+            models.get(b.id)?.visual.update(t+b.id*.41, (flow.buildings.get(b.id)?.rate ?? 0) > 1e-7, flow.buildings.get(b.id)?.rate ?? 0, reduced); for (const o of s.outcrops) {
             const g = outcropModels.get(o.id)?.root;
             if (g) {
                 const x=-9+distance-o.born,z=o.side*5.65;
