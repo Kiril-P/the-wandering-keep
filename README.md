@@ -24,8 +24,8 @@ Progress saves in your browser. This is a single-player first chapter; there is 
 TypeScript, Three.js, Vite.
 
 ```sh
-bun install
-bun run dev
+npm install
+npm run dev
 ```
 
 [Development, verification, and deployment notes](DEVELOPMENT.md).
