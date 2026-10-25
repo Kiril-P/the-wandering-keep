@@ -4,7 +4,7 @@
 
 Grow a castle on the back of Morrow, a six-legged stone guardian with a long road ahead.
 
-**[▶ Play in browser](https://kpetrovski.me/play/the-wandering-keep/)**
+**[▶ Play in browser](https://keep.kirilpetrovski.com/)**
 
 ![The Wandering Keep: 01](docs/media/10-the-wandering-keep-01.png)
 
